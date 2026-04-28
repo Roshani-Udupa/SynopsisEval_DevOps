@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { Search, FileText, Zap, Download, Clock, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react'
 import { Button, Badge, Spinner } from '../../components/ui'
 import api from '../../utils/api'
+import { downloadDocument } from '../../utils/download'
 import { clsx } from 'clsx'
 import { format } from 'date-fns'
 
@@ -90,6 +91,14 @@ const DocumentHubPage: React.FC = () => {
 
       toast.success(`Plagiarism check complete — ${mockScore.toFixed(1)}% similarity`)
     }, 5000)
+  }
+
+  const handleDownload = async (documentId: string, fileName: string) => {
+    try {
+      await downloadDocument(documentId, fileName)
+    } catch {
+      toast.error('Failed to download document')
+    }
   }
 
   const filtered = docs.filter((d) =>
@@ -214,7 +223,11 @@ const DocumentHubPage: React.FC = () => {
                             Check
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownload(doc.id, doc.file_name)}
+                        >
                           <Download className="w-3.5 h-3.5" />
                         </Button>
                       </div>

@@ -4,7 +4,10 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from app.core.config import settings
+from app.core.email import password_reset_email, send_email
 from app.core.database import get_db
+from app.core.notifications import notify_admins
 from app.core.security import hash_password, verify_password, create_access_token
 from app.models.user import User, ReviewerProfile, Guide, Team, TeamMember, PasswordResetToken
 from app.schemas.auth import (
@@ -61,6 +64,8 @@ async def register_reviewer(payload: ReviewerRegisterRequest, db: AsyncSession =
         email=payload.email,
         password_hash=hash_password(payload.password),
         full_name=payload.full_name,
+        department=payload.department,
+        designation=payload.designation,
         role="reviewer",
         status="pending",
     )
@@ -74,6 +79,16 @@ async def register_reviewer(payload: ReviewerRegisterRequest, db: AsyncSession =
         expertise=payload.expertise or [],
     )
     db.add(profile)
+
+    await db.commit()
+
+    await notify_admins(
+        db,
+        title="New reviewer application",
+        message=f"{payload.full_name} submitted a reviewer registration request.",
+        type="info",
+        action_url="/admin/reviewers",
+    )
     await db.commit()
 
     return MessageResponse(
@@ -154,6 +169,16 @@ async def register_team(payload: TeamRegisterRequest, db: AsyncSession = Depends
         ))
 
     await db.commit()
+
+    await notify_admins(
+        db,
+        title="New team registration",
+        message=f"{payload.team_name} has been submitted for approval.",
+        type="info",
+        action_url="/admin/teams",
+    )
+
+    await db.commit()
     return MessageResponse(
         message="Team registration submitted. All members will gain access once approved by the administrator."
     )
@@ -177,7 +202,16 @@ async def request_password_reset(payload: PasswordResetRequest, db: AsyncSession
         )
         db.add(reset_token)
         await db.commit()
-        # In production: send email with reset link containing raw_token
+
+        reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={raw_token}"
+        subject, html_body = password_reset_email(reset_url, user.full_name)
+        text_body = (
+            f"Hi {user.full_name},\n\n"
+            "We received a request to reset the password for your Synopsis Review Portal account.\n"
+            f"Reset your password here: {reset_url}\n\n"
+            "This link expires in 1 hour."
+        )
+        await send_email(user.email, subject, html_body, text_body)
 
     return MessageResponse(
         message="If an account exists with that email, a password reset link has been sent."

@@ -16,7 +16,7 @@ interface NavItem {
 }
 
 interface PortalLayoutProps {
-  navItems: NavItem[]
+  navItems: readonly NavItem[]
   children: React.ReactNode
   portalTitle: string
   portalColor?: string
@@ -154,9 +154,22 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative">
+            <Link
+              to="/notifications"
+              aria-label="Notifications"
+              title="Notifications"
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
+            >
               <Bell className="w-4 h-4 text-gray-500" />
-            </button>
+            </Link>
+            <Link
+              to="/settings"
+              aria-label="Settings"
+              title="Settings"
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
+            >
+              <Settings className="w-4 h-4 text-gray-500" />
+            </Link>
           </div>
         </header>
 

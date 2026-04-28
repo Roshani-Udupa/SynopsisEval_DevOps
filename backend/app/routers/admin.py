@@ -10,9 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 from pydantic import BaseModel
 from app.core.database import get_db
+from app.core.email import generic_announcement_email, send_bulk_email
+from app.core.notifications import create_notification, notify_users
 from app.core.security import require_admin
 from app.models.user import (
-    User, Team, ReviewerProfile, ReviewerAssignment,
+    User, Team, TeamMember, ReviewerProfile, ReviewerAssignment,
     Document, PlagiarismJob, ReviewScore, EmailLog, AuditLog
 )
 
@@ -127,10 +129,12 @@ async def update_team_status(
     team.status = body.status
     team.rejection_note = body.rejection_note
 
+    members = []
+    if body.status in {"approved", "rejected"}:
+        members = (await db.execute(select(TeamMember).where(TeamMember.team_id == team.id))).scalars().all()
+
     # If approved, activate all team member accounts
     if body.status == "approved":
-        from app.models.user import TeamMember
-        members = (await db.execute(select(TeamMember).where(TeamMember.team_id == team.id))).scalars().all()
         for m in members:
             user = await db.get(User, m.user_id)
             if user:
@@ -144,6 +148,28 @@ async def update_team_status(
         metadata_json={"note": body.rejection_note},
     ))
     await db.commit()
+
+    if body.status == "approved":
+        await notify_users(
+            db,
+            [m.user_id for m in members],
+            title="Team approved",
+            message=f"Your team {team.team_name} has been approved and is now active.",
+            type="success",
+            action_url="/student",
+        )
+        await db.commit()
+    elif body.status == "rejected":
+        await notify_users(
+            db,
+            [m.user_id for m in members],
+            title="Team rejected",
+            message=f"Your team {team.team_name} was rejected. {body.rejection_note or 'Please review the feedback from the administrator.'}",
+            type="warning",
+            action_url="/student",
+        )
+        await db.commit()
+
     return {"message": f"Team {body.status}"}
 
 
@@ -162,6 +188,11 @@ async def toggle_score_release(
     if not team:
         raise HTTPException(404, "Team not found")
     team.scores_released = body.scores_released
+
+    members = []
+    if body.scores_released:
+        members = (await db.execute(select(TeamMember).where(TeamMember.team_id == team.id))).scalars().all()
+
     db.add(AuditLog(
         actor_id=current_user.id,
         action="SCORES_RELEASED" if body.scores_released else "SCORES_HIDDEN",
@@ -169,6 +200,18 @@ async def toggle_score_release(
         entity_id=team.id,
     ))
     await db.commit()
+
+    if body.scores_released:
+        await notify_users(
+            db,
+            [m.user_id for m in members],
+            title="Review scores released",
+            message=f"Review scores for {team.team_name} are now available in your portal.",
+            type="success",
+            action_url="/student/results",
+        )
+        await db.commit()
+
     return {"message": "Updated"}
 
 
@@ -204,8 +247,8 @@ async def list_reviewers(
             "full_name": r.full_name,
             "email": r.email,
             "status": r.status,
-            "department": profile.department if profile else None,
-            "designation": profile.designation if profile else None,
+            "department": profile.department if profile and profile.department else r.department,
+            "designation": profile.designation if profile and profile.designation else r.designation,
             "expertise": profile.expertise if profile else [],
             "created_at": r.created_at.isoformat(),
             "assigned_teams": assigned_teams,
@@ -224,6 +267,15 @@ async def approve_reviewer(
         raise HTTPException(404, "Reviewer not found")
     user.status = "approved"
     db.add(AuditLog(actor_id=current_user.id, action="REVIEWER_APPROVED", entity_type="user", entity_id=user.id))
+    await db.commit()
+    await create_notification(
+        db,
+        recipient_id=user.id,
+        title="Reviewer account approved",
+        message="Your reviewer account has been approved. You can now access the reviewer portal.",
+        type="success",
+        action_url="/reviewer",
+    )
     await db.commit()
     return {"message": "Reviewer approved"}
 
@@ -245,7 +297,22 @@ async def assign_reviewer(
         assigned_by=current_user.id,
     )
     db.add(assignment)
+
+    reviewer = await db.get(User, uuid.UUID(body.reviewer_id))
+    team = await db.get(Team, uuid.UUID(body.team_id))
     await db.commit()
+
+    if reviewer and team:
+        await create_notification(
+            db,
+            recipient_id=reviewer.id,
+            title="New review assignment",
+            message=f"You have been assigned to review {team.team_name}.",
+            type="info",
+            action_url="/reviewer/assigned-teams",
+        )
+        await db.commit()
+
     return {"message": "Assigned"}
 
 
@@ -420,6 +487,20 @@ async def publish_all_scores(
     )
     db.add(AuditLog(actor_id=current_user.id, action="ALL_SCORES_RELEASED"))
     await db.commit()
+
+    approved_teams = (await db.execute(select(Team).where(Team.status == "approved"))).scalars().all()
+    for team in approved_teams:
+        members = (await db.execute(select(TeamMember).where(TeamMember.team_id == team.id))).scalars().all()
+        await notify_users(
+            db,
+            [m.user_id for m in members],
+            title="Review scores released",
+            message=f"Review scores for {team.team_name} are now available in your portal.",
+            type="success",
+            action_url="/student/results",
+        )
+    await db.commit()
+
     return {"message": "All scores published"}
 
 
@@ -431,22 +512,54 @@ class SendMessageBody(BaseModel):
     template_used: Optional[str] = None
 
 
+async def _resolve_communication_recipients(
+    db: AsyncSession,
+    recipient_type: str,
+) -> list[str]:
+    if recipient_type == "all_reviewers":
+        query = select(User.email).where(User.role == "reviewer")
+    else:
+        team_query = select(User.email).join(TeamMember, TeamMember.user_id == User.id)
+        if recipient_type == "all_teams":
+            query = team_query.where(User.role.in_(["student_leader", "student_member"]))
+        elif recipient_type == "pending_teams":
+            query = team_query.join(Team, Team.id == TeamMember.team_id).where(Team.status == "pending")
+        elif recipient_type == "approved_teams":
+            query = team_query.join(Team, Team.id == TeamMember.team_id).where(Team.status == "approved")
+        else:
+            raise HTTPException(400, "Unsupported recipient type")
+
+    result = await db.execute(query.distinct())
+    emails = [email for email in result.scalars().all() if email]
+    unique_emails = list(dict.fromkeys(emails))
+    if not unique_emails:
+        raise HTTPException(404, "No recipients found for the selected audience")
+    return unique_emails
+
+
 @router.post("/communications/send")
 async def send_communication(
     payload: SendMessageBody,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_admin),
 ):
+    recipient_emails = await _resolve_communication_recipients(db, payload.recipient_type)
+    _, html_body = generic_announcement_email(payload.subject, payload.body)
+
     log = EmailLog(
         sent_by=current_user.id,
         recipient_type=payload.recipient_type,
         subject=payload.subject,
         body=payload.body,
         template_used=payload.template_used,
-        status="sent",
-        mock_sent_at=datetime.now(timezone.utc),
+        status="queued",
     )
     db.add(log)
+
+    await db.flush()
+    delivery = await send_bulk_email(recipient_emails, payload.subject, html_body, payload.body)
+    log.status = "sent" if delivery["failed"] == 0 else "failed"
+    log.sent_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(log)
 
@@ -455,7 +568,7 @@ async def send_communication(
         "recipient_type": log.recipient_type,
         "subject": log.subject,
         "status": log.status,
-        "mock_sent_at": log.mock_sent_at.isoformat(),
+        "sent_at": log.sent_at.isoformat() if log.sent_at else None,
         "created_at": log.created_at.isoformat(),
     }
 
@@ -473,7 +586,7 @@ async def get_email_logs(
             "recipient_type": l.recipient_type,
             "subject": l.subject,
             "status": l.status,
-            "mock_sent_at": l.mock_sent_at.isoformat() if l.mock_sent_at else None,
+            "sent_at": l.sent_at.isoformat() if l.sent_at else None,
             "created_at": l.created_at.isoformat(),
         }
         for l in logs

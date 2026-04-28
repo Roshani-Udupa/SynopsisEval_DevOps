@@ -7,6 +7,10 @@ import LoginPage from './pages/auth/LoginPage'
 import TeamRegistrationPage from './pages/auth/TeamRegistrationPage'
 import ReviewerRegistrationPage from './pages/auth/ReviewerRegistrationPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
+import SettingsPage from './pages/shared/SettingsPage'
+import NotificationsPage from './pages/shared/NotificationsPage'
+import ErrorPage from './pages/shared/ErrorPage'
 
 // Layout
 import PortalLayout from './components/layout/PortalLayout'
@@ -15,6 +19,12 @@ import PortalLayout from './components/layout/PortalLayout'
 import StudentDashboard from './pages/student/StudentDashboard'
 import DocumentManagementPage from './pages/student/DocumentManagementPage'
 import ResultsPage from './pages/student/ResultsPage'
+
+// Reviewer pages
+import ReviewerDashboard from './pages/reviewer/ReviewerDashboard'
+import AssignedTeamsPage from './pages/reviewer/AssignedTeamsPage'
+import SubmittedReviewsPage from './pages/reviewer/SubmittedReviewsPage'
+import ReviewSubmissionPage from './pages/reviewer/ReviewerSubmissionPage'
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -30,7 +40,7 @@ import { useAuthStore } from './store/authStore'
 // Nav configs
 import {
   LayoutDashboard, FileText, BarChart2,
-  Users, Star, Zap, TrendingUp, Mail
+  Users, Star, Zap, TrendingUp, Mail, Bell, Settings
 } from 'lucide-react'
 
 const STUDENT_NAV = [
@@ -48,6 +58,24 @@ const ADMIN_NAV = [
   { label: 'Communications', path: '/admin/communications', icon: Mail },
 ]
 
+const REVIEWER_NAV = [
+  { label: 'Dashboard', path: '/reviewer', icon: LayoutDashboard },
+  { label: 'Assigned Teams', path: '/reviewer/assigned-teams', icon: Users },
+  { label: 'My Reviews', path: '/reviewer/my-reviews', icon: FileText },
+]
+
+const COMMON_NAV = [
+  { label: 'Notifications', path: '/notifications', icon: Bell },
+  { label: 'Settings', path: '/settings', icon: Settings },
+]
+
+const PORTAL_CONFIG = {
+  student_leader: { navItems: [...STUDENT_NAV, ...COMMON_NAV], portalTitle: 'Student Portal' },
+  student_member: { navItems: [...STUDENT_NAV, ...COMMON_NAV], portalTitle: 'Student Portal' },
+  reviewer: { navItems: [...REVIEWER_NAV, ...COMMON_NAV], portalTitle: 'Reviewer Portal' },
+  admin: { navItems: [...ADMIN_NAV, ...COMMON_NAV], portalTitle: 'Admin Portal' },
+} as const
+
 // ── Route Guards ───────────────────────────────────────────────────────────
 const RequireAuth: React.FC<{
   children: React.ReactNode
@@ -56,9 +84,24 @@ const RequireAuth: React.FC<{
   const user = useAuthStore((s) => s.user)
   if (!user) return <Navigate to="/login" replace />
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/error/403" replace />
   }
   return <>{children}</>
+}
+
+const SharedPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const user = useAuthStore((s) => s.user)
+
+  if (!user) return <Navigate to="/login" replace />
+
+  const config = PORTAL_CONFIG[user.role as keyof typeof PORTAL_CONFIG]
+  if (!config) return <Navigate to="/error/403" replace />
+
+  return (
+    <PortalLayout navItems={config.navItems} portalTitle={config.portalTitle}>
+      {children}
+    </PortalLayout>
+  )
 }
 
 const StudentPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -72,6 +115,14 @@ const StudentPortal: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 const AdminPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <RequireAuth allowedRoles={['admin']}>
     <PortalLayout navItems={ADMIN_NAV} portalTitle="Admin Portal">
+      {children}
+    </PortalLayout>
+  </RequireAuth>
+)
+
+const ReviewerPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <RequireAuth allowedRoles={['reviewer']}>
+    <PortalLayout navItems={REVIEWER_NAV} portalTitle="Reviewer Portal">
       {children}
     </PortalLayout>
   </RequireAuth>
@@ -103,6 +154,7 @@ const App: React.FC = () => {
         <Route path="/register/team" element={<TeamRegistrationPage />} />
         <Route path="/register/reviewer" element={<ReviewerRegistrationPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Student Portal */}
         <Route path="/student" element={
@@ -135,8 +187,35 @@ const App: React.FC = () => {
           <AdminPortal><CommunicationsPage /></AdminPortal>
         } />
 
+        {/* Reviewer Portal */}
+        <Route path="/reviewer" element={
+          <ReviewerPortal><ReviewerDashboard /></ReviewerPortal>
+        } />
+        <Route path="/reviewer/assigned-teams" element={
+          <ReviewerPortal><AssignedTeamsPage /></ReviewerPortal>
+        } />
+        <Route path="/reviewer/my-reviews" element={
+          <ReviewerPortal><SubmittedReviewsPage /></ReviewerPortal>
+        } />
+        <Route path="/reviewer/submit-review/:teamId" element={
+          <ReviewerPortal><ReviewSubmissionPage /></ReviewerPortal>
+        } />
+
+        {/* Shared Pages */}
+        <Route path="/settings" element={
+          <SharedPortal><SettingsPage /></SharedPortal>
+        } />
+        <Route path="/notifications" element={
+          <SharedPortal><NotificationsPage /></SharedPortal>
+        } />
+
+        {/* Error Pages */}
+        <Route path="/error/403" element={<ErrorPage type="403" />} />
+        <Route path="/error/404" element={<ErrorPage type="404" />} />
+        <Route path="/error/500" element={<ErrorPage type="500" />} />
+
         {/* 404 */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/error/404" replace />} />
       </Routes>
     </BrowserRouter>
   )

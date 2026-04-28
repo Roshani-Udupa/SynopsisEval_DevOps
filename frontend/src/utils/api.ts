@@ -15,9 +15,14 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status
+    if (status === 401) {
       useAuthStore.getState().logout()
       window.location.href = '/login'
+    } else if (status === 403) {
+      window.location.href = '/error/403'
+    } else if (status >= 500) {
+      window.location.href = '/error/500'
     }
     return Promise.reject(error)
   }

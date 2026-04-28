@@ -4,13 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.routers import auth, admin, student
+from app.routers import auth, admin, reviewer, shared, student
 
 # Import all models to register them with Base metadata
 from app.models.user import (
     User, ReviewerProfile, Guide, Team, TeamMember,
     ReviewerAssignment, Document, PlagiarismJob,
-    ReviewScore, EmailLog, PasswordResetToken, AuditLog
+    ReviewScore, EmailLog, Notification, PasswordResetToken, AuditLog
 )
 
 app = FastAPI(
@@ -33,6 +33,8 @@ app.add_middleware(
 # Routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(reviewer.router, prefix="/api")
+app.include_router(shared.router, prefix="/api")
 app.include_router(student.router, prefix="/api")
 
 # Uploads directory (for file serving)

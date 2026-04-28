@@ -32,7 +32,7 @@ reviewer_assignments → Junction: reviewers ↔ teams
 documents            → Uploaded PDF synopses (versioned)
 plagiarism_jobs      → Mocked Ollama AI check jobs
 review_scores        → Reviewer scores per team (4 criteria × 10 pts)
-email_logs           → Mocked Nodemailer outbox
+email_logs           → SMTP delivery log
 password_reset_tokens→ Time-limited reset tokens
 audit_logs           → Admin action history
 ```
@@ -85,7 +85,7 @@ synopsis-portal/
         └── pages/
             ├── auth/
             │   ├── LoginPage.tsx
-            │   ├── TeamRegistrationPage.tsx   ← 4-step wizard
+            │   ├── TeamRegistrationPage.tsx
             │   ├── ReviewerRegistrationPage.tsx
             │   └── ForgotPasswordPage.tsx
             ├── student/
@@ -98,7 +98,7 @@ synopsis-portal/
                 ├── ReviewerManagementPage.tsx ← Approve + assign
                 ├── DocumentHubPage.tsx        ← Plagiarism check (mocked)
                 ├── ScoreDashboardPage.tsx     ← Publish toggle per team
-                └── CommunicationsPage.tsx     ← Email log (mocked SMTP)
+                └── CommunicationsPage.tsx     ← Email log (SMTP delivery)
 ```
 
 ---
@@ -138,14 +138,14 @@ cd backend
 
 # Create virtual environment
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your SECRET_KEY
+# Edit .env with your SECRET_KEY and SMTP passowrd and username.
 
 # Start server
 uvicorn app.main:app --reload --port 8000
@@ -219,7 +219,7 @@ Password: admin123
 | PATCH  | `/api/admin/documents/{id}/plagiarism-result` | Update mock result      |
 | GET    | `/api/admin/score-dashboard`                  | All teams + scores      |
 | POST   | `/api/admin/score-dashboard/publish-all`      | Publish all scores      |
-| POST   | `/api/admin/communications/send`              | Log email (mock send)   |
+| POST   | `/api/admin/communications/send`              | Send email via SMTP     |
 | GET    | `/api/admin/email-logs`                       | Email history           |
 
 ---

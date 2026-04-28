@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Send, Mail, Clock, CheckCircle2, ChevronDown } from 'lucide-react'
+import { Send, Mail, Clock, CheckCircle2, ChevronDown, XCircle } from 'lucide-react'
 import { Button, Spinner, Alert } from '../../components/ui'
 import api from '../../utils/api'
 import { clsx } from 'clsx'
@@ -65,7 +65,7 @@ interface EmailLog {
   recipient_type: string
   subject: string
   status: string
-  mock_sent_at: string
+  sent_at: string | null
   created_at: string
 }
 
@@ -113,7 +113,14 @@ const CommunicationsPage: React.FC = () => {
         body,
         template_used: selectedTemplate !== 'custom' ? selectedTemplate : null,
       })
-      toast.success('Message logged and queued for sending!')
+      const deliveryStatus = res.data.status
+      toast[
+        deliveryStatus === 'sent' ? 'success' : 'error'
+      ](
+        deliveryStatus === 'sent'
+          ? 'Message sent and logged!'
+          : 'Message logged, but one or more deliveries failed.'
+      )
       setLogs((prev) => [res.data, ...prev])
       // Reset
       setSubject('')
@@ -131,7 +138,7 @@ const CommunicationsPage: React.FC = () => {
       <div>
         <h1 className="text-2xl font-display text-gray-900">Communications</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Send announcements to teams and reviewers. Messages are logged; SMTP delivery is simulated.
+          Send announcements to teams and reviewers. Messages are delivered through SMTP and logged here.
         </p>
       </div>
 
@@ -203,8 +210,8 @@ const CommunicationsPage: React.FC = () => {
 
             <Alert type="info">
               <span className="text-xs">
-                <strong>Mock Mode:</strong> Clicking Send will save this message to the database
-                and simulate delivery. No actual emails will be sent.
+                <strong>SMTP delivery:</strong> Clicking Send will email the selected recipients and
+                save the message to the database.
               </span>
             </Alert>
 
@@ -251,13 +258,15 @@ const CommunicationsPage: React.FC = () => {
                           {RECIPIENT_TYPES.find((r) => r.value === log.recipient_type)?.label || log.recipient_type}
                         </span>
                         <span className="text-xs text-gray-400">
-                          {format(new Date(log.created_at), 'MMM d • h:mm a')}
+                          {format(new Date(log.sent_at || log.created_at), 'MMM d • h:mm a')}
                         </span>
                       </div>
                     </div>
                     <div className="flex-shrink-0">
                       {log.status === 'sent' ? (
                         <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      ) : log.status === 'failed' ? (
+                        <XCircle className="w-4 h-4 text-red-500" />
                       ) : (
                         <Clock className="w-4 h-4 text-amber-400" />
                       )}

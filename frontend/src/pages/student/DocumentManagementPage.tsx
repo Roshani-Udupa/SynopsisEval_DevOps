@@ -8,6 +8,7 @@ import {
 import { Button, Badge, Alert, Spinner } from '../../components/ui'
 import { useAuthStore } from '../../store/authStore'
 import api from '../../utils/api'
+import { downloadDocument } from '../../utils/download'
 import { clsx } from 'clsx'
 import { format } from 'date-fns'
 
@@ -53,6 +54,14 @@ const DocumentManagementPage: React.FC = () => {
       toast.error('Failed to load documents')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDownload = async (documentId: string, fileName: string) => {
+    try {
+      await downloadDocument(documentId, fileName)
+    } catch {
+      toast.error('Failed to download document')
     }
   }
 
@@ -231,7 +240,11 @@ const DocumentManagementPage: React.FC = () => {
                   />
                 </div>
               )}
-              <Button variant="secondary" size="sm">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleDownload(latestDoc.id, latestDoc.file_name)}
+              >
                 <Download className="w-3.5 h-3.5" /> Download
               </Button>
             </div>
@@ -281,7 +294,11 @@ const DocumentManagementPage: React.FC = () => {
                     </td>
                     <td className="px-5 py-3 text-gray-500 text-xs">{doc.uploader_name}</td>
                     <td className="px-5 py-3">
-                      <Button variant="ghost" size="sm">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownload(doc.id, doc.file_name)}
+                      >
                         <Download className="w-3.5 h-3.5" />
                       </Button>
                     </td>

@@ -16,6 +16,7 @@ CREATE TYPE team_status AS ENUM ('pending', 'approved', 'rejected');
 CREATE TYPE document_status AS ENUM ('uploaded', 'processing', 'completed', 'failed');
 CREATE TYPE job_status AS ENUM ('pending', 'processing', 'completed', 'failed');
 CREATE TYPE email_status AS ENUM ('queued', 'sent', 'failed');
+CREATE TYPE notification_type AS ENUM ('info', 'success', 'warning', 'error');
 
 -- ============================================================
 -- USERS TABLE
@@ -26,6 +27,8 @@ CREATE TABLE users (
     email           VARCHAR(255) UNIQUE NOT NULL,
     password_hash   TEXT NOT NULL,
     full_name       VARCHAR(255) NOT NULL,
+    department      VARCHAR(255),
+    designation     VARCHAR(255),
     role            user_role NOT NULL,
     status          account_status NOT NULL DEFAULT 'pending',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -173,7 +176,7 @@ CREATE TABLE review_scores (
 );
 
 -- ============================================================
--- EMAIL LOGS TABLE (mocked Nodemailer integration)
+-- EMAIL LOGS TABLE (SMTP delivery log)
 -- ============================================================
 
 CREATE TABLE email_logs (
@@ -185,7 +188,22 @@ CREATE TABLE email_logs (
     body            TEXT NOT NULL,
     template_used   VARCHAR(100),
     status          email_status NOT NULL DEFAULT 'queued',
-    mock_sent_at    TIMESTAMPTZ,            -- When the mock "sent" it
+    mock_sent_at    TIMESTAMPTZ,            -- When the email was sent
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================
+-- NOTIFICATIONS TABLE
+-- ============================================================
+
+CREATE TABLE notifications (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    recipient_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title           VARCHAR(255) NOT NULL,
+    message         TEXT NOT NULL,
+    type            notification_type NOT NULL DEFAULT 'info',
+    is_read         BOOLEAN NOT NULL DEFAULT FALSE,
+    action_url      TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

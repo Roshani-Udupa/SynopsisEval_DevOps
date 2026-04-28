@@ -18,6 +18,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    department: Mapped[str | None] = mapped_column(String(255))
+    designation: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(
         SAEnum("student_leader", "student_member", "reviewer", "admin", name="user_role"),
         nullable=False,
@@ -35,6 +37,7 @@ class User(Base):
     reviewer_profile: Mapped["ReviewerProfile"] = relationship("ReviewerProfile", back_populates="user", uselist=False)
     uploaded_documents: Mapped[list["Document"]] = relationship("Document", foreign_keys="Document.uploaded_by", back_populates="uploader")
     review_scores: Mapped[list["ReviewScore"]] = relationship("ReviewScore", foreign_keys="ReviewScore.reviewer_id", back_populates="reviewer")
+    notifications: Mapped[list["Notification"]] = relationship("Notification", foreign_keys="Notification.recipient_id", back_populates="recipient")
 
 
 # ── Reviewer Profiles ──────────────────────────────────────────────────────
@@ -200,10 +203,30 @@ class EmailLog(Base):
         SAEnum("queued", "sent", "failed", name="email_status"),
         nullable=False, default="queued",
     )
-    mock_sent_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column("mock_sent_at", TIMESTAMP(timezone=True))
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now())
 
     sender: Mapped["User"] = relationship("User", foreign_keys=[sent_by])
+
+
+# ── Notifications ────────────────────────────────────────────────────────
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    recipient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[str] = mapped_column(
+        SAEnum("info", "success", "warning", "error", name="notification_type"),
+        nullable=False,
+        default="info",
+    )
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    action_url: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    recipient: Mapped["User"] = relationship("User", foreign_keys=[recipient_id], back_populates="notifications")
 
 
 # ── Password Reset Tokens ──────────────────────────────────────────────────
