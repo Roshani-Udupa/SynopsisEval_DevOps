@@ -53,53 +53,96 @@ const DocumentHubPage: React.FC = () => {
     }
   }
 
-  const triggerPlagiarismCheck = async (docId: string) => {
-    // Immediately update UI to "processing"
+  // const triggerPlagiarismCheck = async (docId: string) => {
+  //   // Immediately update UI to "processing"
+  //   setDocs((prev) =>
+  //     prev.map((d) => d.id === docId ? { ...d, plagiarism_status: 'processing' } : d)
+  //   )
+  //   setProcessing((prev) => new Set([...prev, docId]))
+
+  //   try {
+  //     // Tell backend to start job
+  //     await api.post(`/admin/documents/${docId}/plagiarism-check`)
+  //   } catch {
+  //     // Even if backend fails, we simulate
+  //   }
+
+  //   // Mock: 5 second delay, then "completed" with random score
+  //   setTimeout(() => {
+  //     const mockScore = parseFloat((Math.random() * 45 + 5).toFixed(2))
+  //     setDocs((prev) =>
+  //       prev.map((d) =>
+  //         d.id === docId
+  //           ? { ...d, plagiarism_status: 'completed', similarity_score: mockScore }
+  //           : d
+  //       )
+  //     )
+  //     setProcessing((prev) => {
+  //       const next = new Set(prev)
+  //       next.delete(docId)
+  //       return next
+  //     })
+
+  //     // Optimistically update backend
+  //     api.patch(`/admin/documents/${docId}/plagiarism-result`, {
+  //       status: 'completed',
+  //       similarity_score: mockScore,
+  //     }).catch(() => {})
+
+  //     toast.success(`Plagiarism check complete — ${mockScore.toFixed(1)}% similarity`)
+  //   }, 5000)
+  // }
+
+const triggerPlagiarismCheck = async (docId: string) => {
     setDocs((prev) =>
       prev.map((d) => d.id === docId ? { ...d, plagiarism_status: 'processing' } : d)
     )
     setProcessing((prev) => new Set([...prev, docId]))
 
     try {
-      // Tell backend to start job
-      await api.post(`/admin/documents/${docId}/plagiarism-check`)
-    } catch {
-      // Even if backend fails, we simulate
-    }
+      const res = await api.post(`/admin/documents/${docId}/plagiarism-check`)
 
-    // Mock: 5 second delay, then "completed" with random score
-    setTimeout(() => {
-      const mockScore = parseFloat((Math.random() * 45 + 5).toFixed(2))
       setDocs((prev) =>
         prev.map((d) =>
           d.id === docId
-            ? { ...d, plagiarism_status: 'completed', similarity_score: mockScore }
+            ? { ...d, plagiarism_status: res.data.status, similarity_score: res.data.similarity_score ?? 0 }
             : d
         )
       )
+
       setProcessing((prev) => {
         const next = new Set(prev)
         next.delete(docId)
         return next
       })
 
-      // Optimistically update backend
-      api.patch(`/admin/documents/${docId}/plagiarism-result`, {
-        status: 'completed',
-        similarity_score: mockScore,
-      }).catch(() => {})
+      if (res.data.status === 'completed') {
+        toast.success(`Plagiarism check complete — ${(res.data.similarity_score ?? 0).toFixed(1)}% similarity`)
+      } else {
+        toast.error('Plagiarism check failed')
+      }
 
-      toast.success(`Plagiarism check complete — ${mockScore.toFixed(1)}% similarity`)
-    }, 5000)
-  }
-
-  const handleDownload = async (documentId: string, fileName: string) => {
-    try {
-      await downloadDocument(documentId, fileName)
     } catch {
-      toast.error('Failed to download document')
+      toast.error('Failed to start plagiarism check')
+      setDocs((prev) =>
+        prev.map((d) => d.id === docId ? { ...d, plagiarism_status: 'failed' } : d)
+      )
+      setProcessing((prev) => {
+        const next = new Set(prev)
+        next.delete(docId)
+        return next
+      })
     }
+}
+
+const handleDownload = async (documentId: string, fileName: string) => {
+  try {
+    await downloadDocument(documentId, fileName)
+  } catch {
+    toast.error('Failed to download document')
   }
+}
+
 
   const filtered = docs.filter((d) =>
     !search ||
