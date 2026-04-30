@@ -22,7 +22,7 @@ export async function downloadDocument(documentId: string, fileName?: string) {
   const response = await api.get(`/documents/${documentId}/download`, {
     responseType: 'blob',
   })
-
+  const contentDisposition = response.headers['content-disposition'] as string | undefined;
   const resolvedFileName =
     fileName || filenameFromContentDisposition(response.headers['content-disposition']) || DEFAULT_FILENAME
   const blob = new Blob([response.data], {
