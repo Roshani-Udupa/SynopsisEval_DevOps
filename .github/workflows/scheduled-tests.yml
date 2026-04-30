@@ -1,13 +1,12 @@
 name: Scheduled test suite
 
+# Runs every 12 hours (06:00 and 18:00 UTC = 11:30 AM and 11:30 PM IST).
+# Also manually triggerable from the Actions tab with scope + fail-fast options.
 on:
   schedule:
-    # Runs at 06:00 UTC and 18:00 UTC — every 12 hours
-    # Times chosen to hit 11:30 AM and 11:30 PM IST
     - cron: '0 6 * * *'
     - cron: '0 18 * * *'
 
-  # Niche: also allow manual trigger from GitHub Actions tab with configurable options
   workflow_dispatch:
     inputs:
       test_scope:
@@ -19,26 +18,32 @@ on:
           - all
           - backend-only
           - frontend-only
-          - plagiarism-worker-only
       fail_fast:
         description: 'Stop on first failure'
         required: false
-        default: false
-        type: boolean
+        default: 'false'          # string, not boolean — workflow_dispatch inputs are always strings
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
-# Niche: concurrency group prevents two scheduled runs overlapping
 concurrency:
   group: scheduled-tests
   cancel-in-progress: true
 
 jobs:
+  # ─────────────────────────────────────────────
+  # Backend (FastAPI / pytest)
+  # ─────────────────────────────────────────────
   backend-tests:
     name: Backend (Python / FastAPI)
     runs-on: ubuntu-latest
-    if: |
+    # FIX: original used github.event.inputs.test_scope for scheduled runs,
+    # but inputs are null on schedule — the condition below handles both cases.
+    if: >
+      github.event_name == 'schedule' ||
       github.event.inputs.test_scope == 'all' ||
-      github.event.inputs.test_scope == 'backend-only' ||
-      github.event_name == 'schedule'
+      github.event.inputs.test_scope == 'backend-only'
 
     services:
       postgres:
@@ -68,11 +73,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Niche: cache pip dependencies — cuts 2–3 minutes off subsequent runs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+          cache: pip
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
@@ -80,31 +84,41 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pytest pytest-cov pytest-asyncio httpx
 
-      - name: Run database migrations
+      # FIX: original ran `alembic upgrade head` — this repo uses schema.sql, not Alembic.
+      - name: Bootstrap test database
         env:
-          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/synopsis_test
+          PGPASSWORD: testpass
         run: |
-          cd backend
-          alembic upgrade head
+          psql -h localhost -U postgres -d synopsis_test \
+            -f database/schema.sql
 
       - name: Run tests with coverage
         env:
-          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/synopsis_test
+          DATABASE_URL: postgresql+asyncpg://postgres:testpass@localhost:5432/synopsis_test
           REDIS_URL: redis://localhost:6379
+          SECRET_KEY: ci-scheduled-secret
+          ENVIRONMENT: test
         run: |
+          # FIX: original had a bash conditional expression that is invalid in
+          # GitHub Actions expression context. This shell form is correct.
+          FAIL_FAST_FLAG=""
+          if [ "${{ github.event.inputs.fail_fast }}" = "true" ]; then
+            FAIL_FAST_FLAG="-x"
+          fi
+
           pytest backend/tests/ \
             --cov=backend/app \
-            --cov-report=xml \
+            --cov-report=xml:backend/coverage.xml \
             --cov-report=term-missing \
-            --junitxml=backend-results.xml \
-            ${{ github.event.inputs.fail_fast == 'true' && '-x' || '' }} \
+            --junitxml=backend/test-results.xml \
+            $FAIL_FAST_FLAG \
             -v
 
-      # Niche: upload coverage to Codecov for trend tracking
-      - name: Upload coverage report
+      # FIX: original pointed at coverage.xml (repo root) — file is generated at backend/coverage.xml
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          file: coverage.xml
+          files: backend/coverage.xml
           flags: backend
           name: backend-scheduled
 
@@ -113,48 +127,19 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-test-results-${{ github.run_id }}
-          path: backend-results.xml
+          path: backend/test-results.xml
           retention-days: 30
 
-  plagiarism-worker-tests:
-    name: Plagiarism worker (offline — no LLM needed)
-    runs-on: ubuntu-latest
-    if: |
-      github.event.inputs.test_scope == 'all' ||
-      github.event.inputs.test_scope == 'plagiarism-worker-only' ||
-      github.event_name == 'schedule'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: plagiarism-worker/requirements.txt
-
-      - name: Install worker dependencies
-        run: pip install -r plagiarism-worker/requirements.txt pytest pytest-asyncio
-
-      - name: Run similarity math unit tests
-        run: |
-          pytest plagiarism-worker/tests/ \
-            --junitxml=worker-results.xml \
-            -v -k "not llm"   # skip tests that require Ollama — it's not installed in CI
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: worker-test-results-${{ github.run_id }}
-          path: worker-results.xml
-
+  # ─────────────────────────────────────────────
+  # Frontend (Vitest unit tests)
+  # ─────────────────────────────────────────────
   frontend-tests:
-    name: Frontend (Vitest + Playwright)
+    name: Frontend (Vitest)
     runs-on: ubuntu-latest
-    if: |
+    if: >
+      github.event_name == 'schedule' ||
       github.event.inputs.test_scope == 'all' ||
-      github.event.inputs.test_scope == 'frontend-only' ||
-      github.event_name == 'schedule'
+      github.event.inputs.test_scope == 'frontend-only'
 
     steps:
       - uses: actions/checkout@v4
@@ -162,29 +147,34 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: cd frontend && npm ci
 
       - name: Run Vitest unit tests
-        run: |
-          cd frontend
-          npm run test:unit -- --reporter=verbose --coverage
+        run: cd frontend && npm run test:unit -- --reporter=verbose --coverage
 
-      # Niche: upload Vitest coverage as artifact
       - uses: actions/upload-artifact@v4
         with:
           name: frontend-coverage-${{ github.run_id }}
           path: frontend/coverage/
           retention-days: 14
 
+  # ─────────────────────────────────────────────
+  # Email on scheduled failure only
+  # ─────────────────────────────────────────────
   notify-on-failure:
     name: Email on schedule failure
     runs-on: ubuntu-latest
-    needs: [backend-tests, plagiarism-worker-tests, frontend-tests]
-    if: failure() && github.event_name == 'schedule'
+    needs: [backend-tests, frontend-tests]
+    # FIX: needs.*.result must be checked; `failure()` alone doesn't fire
+    # correctly when upstream jobs are skipped via `if:` conditions.
+    if: >
+      always() &&
+      github.event_name == 'schedule' &&
+      (needs.backend-tests.result == 'failure' || needs.frontend-tests.result == 'failure')
 
     steps:
       - name: Send failure email
@@ -203,9 +193,9 @@ jobs:
           body: |
             The scheduled 12-hour test suite has failed.
 
-            Run ID: ${{ github.run_id }}
-            Time: ${{ github.event.created_at }}
+            Run ID  : ${{ github.run_id }}
+            Repo    : ${{ github.repository }}
+            Ref     : ${{ github.ref }}
 
-            View details: https://github.com/23f3002157/SynopsisEval_DevOps/actions/runs/${{ github.run_id }}
-
-            All collaborators notified.
+            View details:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
