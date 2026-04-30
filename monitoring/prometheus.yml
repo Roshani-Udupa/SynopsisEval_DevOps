@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+
+rule_files:
+  - "alert_rules.yml" # This links the rules we are about to create
+
+scrape_configs:
+  - job_name: 'fastapi-backend'
+    static_configs:
+      # Use 'host.docker.internal' if running backend locally, 
+      # or the service name if using Docker Compose
+      - targets: ['host.docker.internal:8000']

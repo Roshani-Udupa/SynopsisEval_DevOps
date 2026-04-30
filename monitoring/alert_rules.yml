@@ -1,0 +1,14 @@
+groups:
+  - name: synopsiseval.alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+      - alert: SlowAPIResponse
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 3m
+      - alert: PlagiarismJobBacklog
+        expr: synopsiseval_plagiarism_jobs_active > 5
+        for: 5m

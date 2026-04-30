@@ -2,7 +2,7 @@
 Admin router — team management, reviewer management,
 document hub, score dashboard, communications.
 """
-import uuid
+import uuid, time
 import httpx
 import asyncio
 from datetime import datetime, timezone
@@ -19,7 +19,8 @@ from app.models.user import (
     User, Team, TeamMember, ReviewerProfile, ReviewerAssignment,
     Document, PlagiarismJob, ReviewScore, EmailLog, AuditLog
 )
-
+from app.core.metrics import TEAM_REGISTRATIONS
+from app.core.metrics import PLAGIARISM_JOBS_ACTIVE, PLAGIARISM_JOB_DURATION
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
@@ -129,6 +130,7 @@ async def update_team_status(
         raise HTTPException(404, "Team not found")
 
     team.status = body.status
+    TEAM_REGISTRATIONS.labels(status=body.status).inc()
     team.rejection_note = body.rejection_note
 
     members = []
@@ -477,6 +479,8 @@ async def trigger_plagiarism(
     current_user=Depends(require_admin),
 ):
     doc = await db.get(Document, uuid.UUID(doc_id))
+    PLAGIARISM_JOBS_ACTIVE.inc()
+    start_time = time.time()
     if not doc:
         raise HTTPException(404, "Document not found")
 
@@ -531,7 +535,9 @@ async def trigger_plagiarism(
     final_score = job.similarity_score
 
     await db.commit()
-
+    duration = time.time() - start_time
+    PLAGIARISM_JOB_DURATION.observe(duration)
+    PLAGIARISM_JOBS_ACTIVE.dec()
     return {
         "message": "Job complete",
         "job_id": final_job_id,
