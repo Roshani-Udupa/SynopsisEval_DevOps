@@ -1,0 +1,37 @@
+name: PR Notification
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  email-notification:
+    name: Alert Team on New PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Mail
+        uses: dawidd6/action-send-mail@v3
+        with:
+          # SMTP Server details
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          
+          # Email Content
+          subject: "🚀 New PR for ${{ github.repository }}: ${{ github.event.pull_request.title }}"
+          to: ${{ secrets.TEAM_EMAILS }}
+          from: "GitHub Actions <${{ secrets.GMAIL_USER }}>"
+          body: |
+            A new Pull Request has been opened in ${{ github.repository }}.
+
+            📌 Title: ${{ github.event.pull_request.title }}
+            👤 Opened by: ${{ github.actor }}
+            🔗 View PR: ${{ github.event.pull_request.html_url }}
+
+            Description:
+            ${{ github.event.pull_request.body }}
+
+            ---
+            Automated notification from your CI/CD Pipeline.
