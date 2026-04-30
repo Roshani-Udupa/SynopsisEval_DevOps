@@ -13,4 +13,5 @@ email-validator
 pydantic
 pydantic-settings
 aiofiles
-python-dotenv  
+python-dotenv
+httpx
