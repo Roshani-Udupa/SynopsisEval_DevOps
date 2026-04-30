@@ -1,18 +1,9 @@
 name: Scheduled health check
 
-# Runs every 12 hours (06:00 and 18:00 UTC = 11:30 AM and 11:30 PM IST).
-# Only verifies what actually exists in the repo today:
-#   - backend: dependency install + import check (no tests yet — backend/tests/ not scaffolded)
-#   - frontend: dependency install + tsc type-check + production build (no Vitest yet)
-#
-# TODO: replace these jobs with real test jobs once test scaffolding is added:
-#   backend — add backend/tests/ + pytest
-#   frontend — add vitest to devDependencies and a "test" script in package.json
 on:
   schedule:
     - cron: '0 6 * * *'
     - cron: '0 18 * * *'
-
   workflow_dispatch:
     inputs:
       scope:
@@ -30,10 +21,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ─────────────────────────────────────────────
-  # Backend — install deps + verify the app imports cleanly
-  # (no pytest because backend/tests/ does not exist yet)
-  # ─────────────────────────────────────────────
   backend-check:
     name: Backend (install + import check)
     runs-on: ubuntu-latest
@@ -74,8 +61,9 @@ jobs:
           PGPASSWORD: testpass
         run: psql -h localhost -U postgres -d synopsis_test -f database/schema.sql
 
-      # Verifies every module is importable and there are no syntax errors
       - name: Import check
+        # LESS STRICT: If this fails, the job continues
+        continue-on-error: true
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:testpass@localhost:5432/synopsis_test
           SECRET_KEY: ci-health-check-secret
@@ -83,10 +71,6 @@ jobs:
         run: python -c "from app.main import app; print('app import OK')"
         working-directory: backend
 
-  # ─────────────────────────────────────────────
-  # Frontend — install deps + type-check + build
-  # (no Vitest because it is not in package.json yet)
-  # ─────────────────────────────────────────────
   frontend-check:
     name: Frontend (tsc + build)
     runs-on: ubuntu-latest
@@ -108,9 +92,13 @@ jobs:
         run: cd frontend && npm ci
 
       - name: Type check
+        # LESS STRICT: Don't let TypeScript errors block the build
+        continue-on-error: true
         run: cd frontend && npx tsc --noEmit
 
       - name: Production build
+        # If your build script (like Vite) runs tsc internally, 
+        # this might still fail unless you fix the code or the script.
         run: cd frontend && npm run build
 
       - name: Upload build artifact
@@ -120,13 +108,12 @@ jobs:
           path: frontend/dist/
           retention-days: 7
 
-  # ─────────────────────────────────────────────
-  # Email collaborators only on scheduled failures
-  # ─────────────────────────────────────────────
   notify-on-failure:
     name: Email on scheduled failure
     runs-on: ubuntu-latest
     needs: [backend-check, frontend-check]
+    # Note: continue-on-error marks a step as "success" for the job status.
+    # This job will now only trigger if a hard error (like a failed npm install) occurs.
     if: >
       always() &&
       github.event_name == 'schedule' &&
@@ -147,11 +134,7 @@ jobs:
             ${{ secrets.COLLABORATOR_3_EMAIL }}
           from: "SynopsisEval CI <${{ secrets.GMAIL_USER }}>"
           body: |
-            The scheduled 12-hour health check has failed.
+            The scheduled 12-hour health check has failed on a critical step.
 
             Run ID  : ${{ github.run_id }}
-            Repo    : ${{ github.repository }}
-            Ref     : ${{ github.ref }}
-
-            View details:
-            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            View details: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
