@@ -1,0 +1,23 @@
+sonar.projectKey=synopsis-portal
+sonar.projectName=Synopsis Portal
+sonar.host.url=http://localhost:9000
+sonar.token=squ_your_user_token
+
+# Sources & Tests
+sonar.sources=backend/app,frontend/src
+sonar.tests=backend/tests,frontend/src
+sonar.test.inclusions=**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx
+
+# Language
+sonar.language=
+
+# Coverage
+sonar.python.coverage.reportPaths=backend/coverage.xml
+sonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
+
+# Python version
+sonar.python.version=3.13
+
+# Exclusions
+sonar.exclusions=**/__pycache__/**,**/.venv/**,**/migrations/**,**/node_modules/**,frontend/coverage/**
+sonar.coverage.exclusions=**/__init__.py,**/migrations/**,**/tests/**,**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx
