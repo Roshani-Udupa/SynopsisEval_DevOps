@@ -1,5 +1,6 @@
 .venv/
 .env
+.venc/
 __pycache__/
 .pytest_cache/
 node_modules/
@@ -12,3 +13,7 @@ sonar-project.properties
 coverage/
 *.log
 .scannerwork/
+.sonar
+help.txt
+pmql.md
+docker-compose.sonarqube.yml

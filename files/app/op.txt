@@ -1,0 +1,293 @@
+  BENCHMARK METRICS — Project Title:
+============================================================
+  [1] Jaccard similarity        : 0.0708
+  [2] N-gram cosine (TF-IDF)    : 0.0000
+  [3] TF-IDF cosine (full vocab): 0.1312
+  [4] LCS ratio                 : 0.0000
+  [5] Composite score           : 0.0601  (6%)
+  [6] Vocab size (unique tokens): 476
+  [7] Token count (sub + ref)   : 1153
+  [8] Processing time (ms/pair) : 1.24 ms
+       Coverage ratio            : 0.1309  (bonus)
+       Papers evaluated          : 20
+       Papers flagged (>20%)     : 0
+============================================================
+
+
+=================================================================
+  EXECUTION COMPLETE — Academic Grant Program - Example Proposal.pdf
+=================================================================
+  File            : Academic Grant Program - Example Proposal.pdf
+  Pages / Words   : 4 pages / 1,547 words
+  Model used      : gemma2:2b
+  Papers fetched  : 20
+  Total time      : 70.3 s
+─────────────────────────────────────────────────────────────────
+  MATH SIMILARITY  (worst-case paper)
+  [1] Jaccard               : 0.0708
+  [2] N-gram cosine         : 0.0000
+  [3] TF-IDF cosine         : 0.1312
+  [4] LCS ratio             : 0.0000
+  [5] Composite score       : 0.0601  (6%  Original)
+  [6] Max composite overall : 6.0%
+  [7] Mean composite        : 3.7%
+  [8] Papers flagged ≥20%   : 0 / 20
+─────────────────────────────────────────────────────────────────
+  LLM ANALYSIS
+  Verdict         : Analysis Error
+  Similarity score: 0%
+  Confidence      : Low
+  Flagged papers  : 0
+
+
+
+
+   | =================================================================
+plagiarism-worker  |   EXECUTION COMPLETE — Arithmetic Coding as a Nonlinear Dynamical System CNSNS.pdf
+plagiarism-worker  | =================================================================
+plagiarism-worker  |   File            : Arithmetic Coding as a Nonlinear Dynamical System CNSNS.pdf
+plagiarism-worker  |   Pages / Words   : 9 pages / 4,654 words
+plagiarism-worker  |   Model used      : gemma2:2b
+plagiarism-worker  |   Papers fetched  : 6
+plagiarism-worker  |   Total time      : 181.3 s
+plagiarism-worker  | ─────────────────────────────────────────────────────────────────
+plagiarism-worker  |   MATH SIMILARITY  (worst-case paper)
+plagiarism-worker  |   [1] Jaccard               : 0.0158
+plagiarism-worker  |   [2] N-gram cosine         : 0.0000
+plagiarism-worker  |   [3] TF-IDF cosine         : 0.0433
+plagiarism-worker  |   [4] LCS ratio             : 0.0000
+plagiarism-worker  |   [5] Composite score       : 0.0183  (2%  Original)
+plagiarism-worker  |   [6] Max composite overall : 1.8%
+plagiarism-worker  |   [7] Mean composite        : 0.8%
+plagiarism-worker  |   [8] Papers flagged ≥20%   : 0 / 6
+plagiarism-worker  | ─────────────────────────────────────────────────────────────────
+plagiarism-worker  |   LLM ANALYSIS
+plagiarism-worker  |   Verdict         : Analysis Error
+plagiarism-worker  |   Similarity score: 0%
+plagiarism-worker  |   Confidence      : Low
+plagiarism-worker  |   Flagged papers  : 0
+plagiarism-worker  | =================================================================
+
+
+
+============================================================
+  BENCHMARK METRICS — This article appeared in a journal published 
+============================================================
+  [1] Jaccard similarity        : 0.0329
+  [2] N-gram cosine (TF-IDF)    : 0.0015
+  [3] TF-IDF cosine (full vocab): 0.2703
+  [4] LCS ratio                 : 0.0000
+  [5] Composite score           : 0.1016  (10%)
+  [6] Vocab size (unique tokens): 919
+  [7] Token count (sub + ref)   : 2432
+  [8] Processing time (ms/pair) : 1.01 ms
+       Coverage ratio            : 0.1072  (bonus)
+       Papers evaluated          : 20
+       Papers flagged (>20%)     : 0
+============================================================
+
+
+=================================================================
+  EXECUTION COMPLETE — Arithmetic Coding as a Nonlinear Dynamical System CNSNS.pdf
+=================================================================
+  File            : Arithmetic Coding as a Nonlinear Dynamical System CNSNS.pdf
+  Pages / Words   : 9 pages / 4,654 words
+  Model used      : llama3.2:3b
+  Papers fetched  : 20
+  Total time      : 62.5 s
+─────────────────────────────────────────────────────────────────
+  MATH SIMILARITY  (worst-case paper)
+  [1] Jaccard               : 0.0329
+  [2] N-gram cosine         : 0.0015
+  [3] TF-IDF cosine         : 0.2703
+  [4] LCS ratio             : 0.0000
+  [5] Composite score       : 0.1016  (10%  Original)
+  [6] Max composite overall : 10.2%
+  [7] Mean composite        : 2.9%
+  [8] Papers flagged ≥20%   : 0 / 20
+─────────────────────────────────────────────────────────────────
+  LLM ANALYSIS
+  Verdict         : Moderate Overlap
+  Similarity score: 40%
+  Confidence      : Medium
+  Flagged papers  : 13
+=================================================================
+
+
+============================================================
+  BENCHMARK METRICS — This article appeared in a journal published 
+============================================================
+  [1] Jaccard similarity        : 0.0329
+  [2] N-gram cosine (TF-IDF)    : 0.0015
+  [3] TF-IDF cosine (full vocab): 0.2703
+  [4] LCS ratio                 : 0.0000
+  [5] Composite score           : 0.1016  (10%)
+  [6] Vocab size (unique tokens): 919
+  [7] Token count (sub + ref)   : 2432
+  [8] Processing time (ms/pair) : 1.22 ms
+       Coverage ratio            : 0.1072  (bonus)
+       Papers evaluated          : 20
+       Papers flagged (>20%)     : 0
+============================================================
+
+
+=================================================================
+  EXECUTION COMPLETE — Arithmetic Coding as a Nonlinear Dynamical System CNSNS.pdf
+=================================================================
+  File            : Arithmetic Coding as a Nonlinear Dynamical System CNSNS.pdf
+  Pages / Words   : 9 pages / 4,654 words
+  Model used      : gemma3:4b
+  Papers fetched  : 20
+  Total time      : 96.4 s
+─────────────────────────────────────────────────────────────────
+  MATH SIMILARITY  (worst-case paper)
+  [1] Jaccard               : 0.0329
+  [2] N-gram cosine         : 0.0015
+  [3] TF-IDF cosine         : 0.2703
+  [4] LCS ratio             : 0.0000
+  [5] Composite score       : 0.1016  (10%  Original)
+  [6] Max composite overall : 10.2%
+  [7] Mean composite        : 2.9%
+  [8] Papers flagged ≥20%   : 0 / 20
+─────────────────────────────────────────────────────────────────
+  LLM ANALYSIS
+  Verdict         : Moderate Overlap
+  Similarity score: 65%
+  Confidence      : Medium
+  Flagged papers  : 4
+=================================================================
+
+
+
+============================================================
+  BENCHMARK METRICS — Inverse Chaotic Map Inference for
+============================================================
+  [1] Jaccard similarity        : 0.0547
+  [2] N-gram cosine (TF-IDF)    : 0.0000
+  [3] TF-IDF cosine (full vocab): 0.2697
+  [4] LCS ratio                 : 0.0000
+  [5] Composite score           : 0.1053  (11%)
+  [6] Vocab size (unique tokens): 496
+  [7] Token count (sub + ref)   : 1094
+  [8] Processing time (ms/pair) : 0.91 ms
+       Coverage ratio            : 0.1381  (bonus)
+       Papers evaluated          : 20
+       Papers flagged (>20%)     : 0
+============================================================
+
+
+=================================================================
+  EXECUTION COMPLETE — NeuroChaos_Learning___Documentation-6.pdf
+=================================================================
+  File            : NeuroChaos_Learning___Documentation-6.pdf
+  Pages / Words   : 8 pages / 2,456 words
+  Model used      : gemma3:4b
+  Papers fetched  : 20
+  Total time      : 82.2 s
+─────────────────────────────────────────────────────────────────
+  MATH SIMILARITY  (worst-case paper)
+  [1] Jaccard               : 0.0547
+  [2] N-gram cosine         : 0.0000
+  [3] TF-IDF cosine         : 0.2697
+  [4] LCS ratio             : 0.0000
+  [5] Composite score       : 0.1053  (11%  Original)
+  [6] Max composite overall : 10.5%
+  [7] Mean composite        : 3.9%
+  [8] Papers flagged ≥20%   : 0 / 20
+─────────────────────────────────────────────────────────────────
+  LLM ANALYSIS
+  Verdict         : Moderate Overlap
+  Similarity score: 75%
+  Confidence      : High
+  Flagged papers  : 4
+=================================================================
+
+
+============================================================
+  BENCHMARK METRICS — Inverse Chaotic Map Inference for
+============================================================
+  [1] Jaccard similarity        : 0.0547
+  [2] N-gram cosine (TF-IDF)    : 0.0000
+  [3] TF-IDF cosine (full vocab): 0.2697
+  [4] LCS ratio                 : 0.0000
+  [5] Composite score           : 0.1053  (11%)
+  [6] Vocab size (unique tokens): 496
+  [7] Token count (sub + ref)   : 1094
+  [8] Processing time (ms/pair) : 0.61 ms
+       Coverage ratio            : 0.1381  (bonus)
+       Papers evaluated          : 20
+       Papers flagged (>20%)     : 0
+============================================================
+
+
+=================================================================
+  EXECUTION COMPLETE — NeuroChaos_Learning___Documentation-6.pdf
+=================================================================
+  File            : NeuroChaos_Learning___Documentation-6.pdf
+  Pages / Words   : 8 pages / 2,456 words
+  Model used      : llama3.2:3b
+  Papers fetched  : 20
+  Total time      : 31.0 s
+─────────────────────────────────────────────────────────────────
+  MATH SIMILARITY  (worst-case paper)
+  [1] Jaccard               : 0.0547
+  [2] N-gram cosine         : 0.0000
+  [3] TF-IDF cosine         : 0.2697
+  [4] LCS ratio             : 0.0000
+  [5] Composite score       : 0.1053  (11%  Original)
+  [6] Max composite overall : 10.5%
+  [7] Mean composite        : 3.9%
+  [8] Papers flagged ≥20%   : 0 / 20
+─────────────────────────────────────────────────────────────────
+  LLM ANALYSIS
+  Verdict         : Analysis Error
+  Similarity score: 0%
+  Confidence      : Low
+  Flagged papers  : 0
+=================================================================
+
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429
+[academic_apis] Total unique papers after dedup: 30
+
+============================================================
+  BENCHMARK METRICS — U-Net: Convolutional Networks for Biomedical 
+============================================================
+  [1] Jaccard similarity        : 0.0605
+  [2] N-gram cosine (TF-IDF)    : 0.0213
+  [3] TF-IDF cosine (full vocab): 0.2716
+  [4] LCS ratio                 : 0.0000
+  [5] Composite score           : 0.1136  (11%)
+  [6] Vocab size (unique tokens): 735
+  [7] Token count (sub + ref)   : 1816
+  [8] Processing time (ms/pair) : 1.33 ms
+       Coverage ratio            : 0.1735  (bonus)
+       Papers evaluated          : 20
+       Papers flagged (>20%)     : 0
+============================================================
+
+
+=================================================================
+  EXECUTION COMPLETE — 1505.04597v1.pdf
+=================================================================
+  File            : 1505.04597v1.pdf
+  Pages / Words   : 8 pages / 3,102 words
+  Model used      : gemma2:2b
+  Papers fetched  : 20
+  Total time      : 74.2 s
+─────────────────────────────────────────────────────────────────
+  MATH SIMILARITY  (worst-case paper)
+  [1] Jaccard               : 0.0605
+  [2] N-gram cosine         : 0.0213
+  [3] TF-IDF cosine         : 0.2716
+  [4] LCS ratio             : 0.0000
+  [5] Composite score       : 0.1136  (11%  Original)
+  [6] Max composite overall : 11.4%
+  [7] Mean composite        : 5.5%
+  [8] Papers flagged ≥20%   : 0 / 20
+─────────────────────────────────────────────────────────────────
+  LLM ANALYSIS
+  Verdict         : Analysis Error
+  Similarity score: 0%
+  Confidence      : Low
+  Flagged papers  : 0
+=================================================================

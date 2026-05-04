@@ -2,7 +2,9 @@
 Admin router — team management, reviewer management,
 document hub, score dashboard, communications.
 """
-import uuid
+import uuid, time
+import httpx
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,7 +19,8 @@ from app.models.user import (
     User, Team, TeamMember, ReviewerProfile, ReviewerAssignment,
     Document, PlagiarismJob, ReviewScore, EmailLog, AuditLog
 )
-
+from app.core.metrics import TEAM_REGISTRATIONS
+from app.core.metrics import PLAGIARISM_JOBS_ACTIVE, PLAGIARISM_JOB_DURATION
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
@@ -127,6 +130,7 @@ async def update_team_status(
         raise HTTPException(404, "Team not found")
 
     team.status = body.status
+    TEAM_REGISTRATIONS.labels(status=body.status).inc()
     team.rejection_note = body.rejection_note
 
     members = []
@@ -342,6 +346,7 @@ async def list_all_documents(
     db: AsyncSession = Depends(get_db),
     _=Depends(require_admin),
 ):
+    db.expire_all()
     result = await db.execute(select(Document).order_by(Document.created_at.desc()))
     docs = result.scalars().all()
     out = []
@@ -365,6 +370,108 @@ async def list_all_documents(
     return out
 
 
+WORKER_URL = "http://localhost:8001"
+
+# @router.post("/documents/{doc_id}/plagiarism-check")
+# async def trigger_plagiarism(
+#     doc_id: str,
+#     db: AsyncSession = Depends(get_db),
+#     current_user=Depends(require_admin),
+# ):
+#     doc = await db.get(Document, uuid.UUID(doc_id))
+#     if not doc:
+#         raise HTTPException(404, "Document not found")
+
+#     existing = await db.execute(select(PlagiarismJob).where(PlagiarismJob.document_id == doc.id))
+#     job = existing.scalar_one_or_none()
+#     if job:
+#         job.status = "processing"
+#         job.started_at = datetime.now(timezone.utc)
+#     else:
+#         job = PlagiarismJob(
+#             document_id=doc.id,
+#             triggered_by=current_user.id,
+#             status="processing",
+#             started_at=datetime.now(timezone.utc),
+#         )
+#         db.add(job)
+#     await db.commit()
+#     await db.refresh(job)
+
+#     # async def run_worker():
+#     #     async with httpx.AsyncClient(timeout=300) as client:
+#     #         # 1. Upload PDF to worker
+#     #         with open(doc.file_path, "rb") as f:
+#     #             start_resp = await client.post(
+#     #                 f"{WORKER_URL}/analyse/start",
+#     #                 files={"file": (f"{doc_id}.pdf", f, "application/pdf")},
+#     #             )
+#     #         worker_job_id = start_resp.json()["job_id"]
+
+#     #         # 2. Poll until done
+#     #         for _ in range(100):
+#     #             await asyncio.sleep(200)
+#     #             result_resp = await client.get(f"{WORKER_URL}/analyse/result/{worker_job_id}")
+#     #             if result_resp.status_code == 202:
+#     #                 continue
+#     #             if result_resp.status_code == 200:
+#     #                 data = result_resp.json()
+#     #                 print(data)
+#     #                 job.similarity_score = data["analysis"]["overall_similarity_score"]
+#     #                 job.status = "completed"
+#     #             else:
+#     #                 job.status = "failed"
+#     #             job.completed_at = datetime.now(timezone.utc)
+#     #             job.report_url = f"/mock-reports/{doc_id}.pdf"
+#     #             await db.commit()
+#     #             return
+
+#     #         job.status = "failed"
+#     #         await db.commit()
+#     async def run_worker():
+#         async with httpx.AsyncClient(timeout=300) as client:
+#             with open(doc.file_path, "rb") as f:
+#                 start_resp = await client.post(
+#                     f"{WORKER_URL}/analyse/start",
+#                     files={"file": (f"{doc_id}.pdf", f, "application/pdf")},
+#                 )
+#             worker_job_id = start_resp.json()["job_id"]
+
+#             for _ in range(100):
+#                 await asyncio.sleep(2)
+#                 result_resp = await client.get(f"{WORKER_URL}/analyse/result/{worker_job_id}")
+#                 if result_resp.status_code == 202:
+#                     continue
+
+#                 async with AsyncSessionLocal() as fresh_db:  # ← fresh session
+#                     result = await fresh_db.execute(
+#                         select(PlagiarismJob).where(PlagiarismJob.document_id == uuid.UUID(doc_id))
+#                     )
+#                     fresh_job = result.scalar_one_or_none()
+#                     if fresh_job:
+#                         if result_resp.status_code == 200:
+#                             data = result_resp.json()
+#                             fresh_job.similarity_score = data["analysis"]["overall_similarity_score"]
+#                             fresh_job.status = "completed"
+#                         else:
+#                             fresh_job.status = "failed"
+#                         fresh_job.completed_at = datetime.now(timezone.utc)
+#                         fresh_job.report_url = f"/mock-reports/{doc_id}.pdf"
+#                         await fresh_db.commit()
+#                 return
+
+#             async with AsyncSessionLocal() as fresh_db:
+#                 result = await fresh_db.execute(
+#                     select(PlagiarismJob).where(PlagiarismJob.document_id == uuid.UUID(doc_id))
+#                 )
+#                 fresh_job = result.scalar_one_or_none()
+#                 if fresh_job:
+#                     fresh_job.status = "failed"
+#                     await fresh_db.commit()
+
+#     asyncio.create_task(run_worker())
+#     return {"message": "Job started", "job_id": str(job.id)}
+
 @router.post("/documents/{doc_id}/plagiarism-check")
 async def trigger_plagiarism(
     doc_id: str,
@@ -372,12 +479,15 @@ async def trigger_plagiarism(
     current_user=Depends(require_admin),
 ):
     doc = await db.get(Document, uuid.UUID(doc_id))
+    PLAGIARISM_JOBS_ACTIVE.inc()
+    start_time = time.time()
     if not doc:
         raise HTTPException(404, "Document not found")
 
+    file_path = doc.file_path  # capture before any commit expires it
+
     existing = await db.execute(select(PlagiarismJob).where(PlagiarismJob.document_id == doc.id))
     job = existing.scalar_one_or_none()
-
     if job:
         job.status = "processing"
         job.started_at = datetime.now(timezone.utc)
@@ -389,9 +499,51 @@ async def trigger_plagiarism(
             started_at=datetime.now(timezone.utc),
         )
         db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    async with httpx.AsyncClient(timeout=300) as client:
+        with open(file_path, "rb") as f:
+            start_resp = await client.post(
+                f"{WORKER_URL}/analyse/start",
+                files={"file": (f"{doc_id}.pdf", f, "application/pdf")},
+            )
+        start_resp.raise_for_status()
+        worker_job_id = start_resp.json()["job_id"]
+
+        for _ in range(100):
+            await asyncio.sleep(2)
+            result_resp = await client.get(f"{WORKER_URL}/analyse/result/{worker_job_id}")
+            if result_resp.status_code == 202:
+                continue
+            if result_resp.status_code == 200:
+                data = result_resp.json()
+                job.similarity_score = data["analysis"]["overall_similarity_score"]
+                job.status = "completed"
+            else:
+                job.status = "failed"
+            break
+        else:
+            job.status = "failed"
+
+    job.completed_at = datetime.now(timezone.utc)
+    job.report_url = f"/mock-reports/{doc_id}.pdf"
+
+    # capture before final commit expires the object
+    final_job_id = str(job.id)
+    final_status = job.status
+    final_score = job.similarity_score
 
     await db.commit()
-    return {"message": "Job started", "job_id": str(job.id)}
+    duration = time.time() - start_time
+    PLAGIARISM_JOB_DURATION.observe(duration)
+    PLAGIARISM_JOBS_ACTIVE.dec()
+    return {
+        "message": "Job complete",
+        "job_id": final_job_id,
+        "similarity_score": final_score,
+        "status": final_status,
+    }
 
 
 class PlagiarismResult(BaseModel):

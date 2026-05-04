@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Plagiarism Detection Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #0a0e17;
+    --bg2:        #0f1623;
+    --bg3:        #151e2e;
+    --border:     #1e2d45;
+    --border2:    #243752;
+    --green:      #00e5a0;
+    --green-dim:  #00b07a;
+    --green-glow: rgba(0,229,160,0.15);
+    --blue:       #4fc3f7;
+    --blue-dim:   #0288d1;
+    --amber:      #ffb74d;
+    --red:        #ef5350;
+    --text:       #c8d8f0;
+    --text-dim:   #6a85a8;
+    --text-bright:#e8f0ff;
+    --mono:       'IBM Plex Mono', monospace;
+    --sans:       'IBM Plex Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid bg ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+
+  .layout {
+    position: relative; z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 48px;
+  }
+  .header-icon {
+    width: 48px; height: 48px;
+    border: 1px solid var(--green-dim);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--green-glow);
+    flex-shrink: 0;
+    font-size: 22px;
+  }
+  .header-text h1 {
+    font-family: var(--mono);
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--green);
+    letter-spacing: 0.02em;
+  }
+  .header-text p {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    margin-top: 4px;
+  }
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--text-dim);
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  /* ── Panel ── */
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+  .panel-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+  }
+  .panel-dot.amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .panel-dot.red   { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+  .panel-label {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .panel-body { padding: 24px; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 2px dashed var(--border2);
+    border-radius: 8px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .upload-zone:hover,
+  .upload-zone.dragover {
+    border-color: var(--green-dim);
+    background: var(--green-glow);
+  }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+  .upload-icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .upload-label {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .upload-sub {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+  .file-selected {
+    margin-top: 16px;
+    padding: 10px 16px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--green);
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .file-selected.show { display: flex; }
+
+  /* ── API keys (collapsible) ── */
+  .keys-toggle {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 20px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    user-select: none;
+  }
+  .keys-toggle:hover { color: var(--text); }
+  .keys-body { display: none; margin-top: 16px; }
+  .keys-body.open { display: block; }
+  .key-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+    align-items: center;
+  }
+  .key-row label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    width: 130px;
+    flex-shrink: 0;
+  }
+  .key-row input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .key-row input:focus { border-color: var(--green-dim); }
+  .key-hint {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  /* ── Submit button ── */
+  .btn-run {
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    background: transparent;
+    border: 1px solid var(--green-dim);
+    border-radius: 6px;
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-run::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--green-glow);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .btn-run:hover::before { opacity: 1; }
+  .btn-run:hover { border-color: var(--green); box-shadow: 0 0 20px var(--green-glow); }
+  .btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Progress ── */
+  #progress-panel { display: none; }
+  .progress-track {
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green-dim), var(--green));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px var(--green);
+    width: 0%;
+  }
+  .log-stream {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    line-height: 2;
+    min-height: 80px;
+  }
+  .log-line { display: flex; gap: 10px; }
+  .log-time { color: var(--border2); }
+  .log-msg  { color: var(--text-dim); }
+  .log-msg.active { color: var(--text); }
+
+  /* ── Results ── */
+  #result-panel { display: none; }
+
+  .score-hero {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    margin-bottom: 28px;
+  }
+  .score-ring {
+    width: 120px; height: 120px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-ring circle.bg   { fill: none; stroke: var(--bg3); stroke-width: 8; }
+  .score-ring circle.fill {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.25,1,0.5,1);
+  }
+  .score-num {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    font-weight: 600;
+  }
+  .score-num span { font-size: 0.7rem; color: var(--text-dim); }
+  .score-meta { flex: 1; }
+  .verdict-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    letter-spacing: 0.04em;
+  }
+  .verdict-badge.low    { background: rgba(0,229,160,0.15); color: var(--green);  border: 1px solid var(--green-dim); }
+  .verdict-badge.medium { background: rgba(255,183,77,0.15); color: var(--amber);  border: 1px solid var(--amber); }
+  .verdict-badge.high   { background: rgba(239,83,80,0.15);  color: var(--red);    border: 1px solid var(--red); }
+  .meta-row {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .meta-row b { color: var(--text); }
+
+  /* ── Summary ── */
+  .summary-text {
+    font-size: 0.88rem;
+    line-height: 1.75;
+    color: var(--text);
+    padding: 16px;
+    background: var(--bg3);
+    border-radius: 6px;
+    border-left: 3px solid var(--green-dim);
+    margin-bottom: 20px;
+  }
+
+  /* ── Contribution / Recommendation ── */
+  .insight-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media(max-width:640px) { .insight-grid { grid-template-columns: 1fr; } }
+  .insight-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .insight-card h4 {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .insight-card p {
+    font-size: 0.82rem;
+    line-height: 1.65;
+    color: var(--text);
+  }
+
+  /* ── Flagged papers ── */
+  .section-title {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .paper-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: grid;
+    grid-template-columns: 48px 1fr auto;
+    gap: 14px;
+    align-items: start;
+    transition: border-color 0.15s;
+  }
+  .paper-card:hover { border-color: var(--border2); }
+  .paper-rank {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-align: center;
+    padding-top: 2px;
+  }
+  .paper-info {}
+  .paper-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-bright);
+    margin-bottom: 4px;
+    line-height: 1.4;
+  }
+  .paper-title a { color: inherit; text-decoration: none; }
+  .paper-title a:hover { color: var(--blue); }
+  .paper-authors {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .paper-source {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.63rem;
+    padding: 2px 6px;
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--blue);
+    margin-right: 6px;
+  }
+  .paper-reason {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .paper-sim {
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding-top: 2px;
+  }
+
+  /* ── Keywords ── */
+  .keyword-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .keyword {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    padding: 3px 8px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--text-dim);
+  }
+
+  /* ── New analysis button ── */
+  .btn-reset {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 10px 20px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-reset:hover { border-color: var(--text-dim); color: var(--text); }
+
+  /* ── Error ── */
+  .error-box {
+    background: rgba(239,83,80,0.08);
+    border: 1px solid var(--red);
+    border-radius: 6px;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--red);
+    line-height: 1.6;
+    display: none;
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+  .pulse { animation: pulse 1.5s ease infinite; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Header -->
+  <div class="header fade-in">
+    <div class="header-icon">🔬</div>
+    <div class="header-text">
+      <h1>Plagiarism Detection Lab <span class="badge">OFFLINE</span></h1>
+      <p>Powered by Ollama LLM · Semantic Scholar · CORE · IEEE · Springer</p>
+    </div>
+  </div>
+
+  <!-- Upload Panel -->
+  <div class="panel fade-in" id="upload-panel">
+    <div class="panel-header">
+      <div class="panel-dot"></div>
+      <span class="panel-label">Document Upload</span>
+    </div>
+    <div class="panel-body">
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept=".pdf" />
+        <div class="upload-icon">📄</div>
+        <div class="upload-label">Drop your PDF here, or click to browse</div>
+        <div class="upload-sub">PDF only · Max 20 MB · Academic synopsis / research paper</div>
+      </div>
+      <div class="file-selected" id="file-selected">
+        <span>📎</span>
+        <span id="file-name"></span>
+        <span id="file-size" style="color:var(--text-dim);margin-left:auto;"></span>
+      </div>
+
+      <!-- Optional API Keys -->
+      <div class="keys-toggle" id="keys-toggle">
+        <span id="keys-arrow">▶</span>
+        Optional API keys — add for IEEE & Springer coverage
+      </div>
+      <div class="keys-body" id="keys-body">
+        <div class="key-row">
+          <label>IEEE Xplore Key</label>
+          <input type="text" id="ieee-key" placeholder="your_ieee_api_key" autocomplete="off"/>
+        </div>
+        <div class="key-row">
+          <label>Springer Nature Key</label>
+          <input type="text" id="springer-key" placeholder="your_springer_api_key" autocomplete="off"/>
+        </div>
+        <div class="key-hint">
+          Without keys, Semantic Scholar &amp; CORE still run (both are free, no key needed).<br>
+          IEEE: <a href="https://developer.ieee.org" target="_blank" style="color:var(--blue)">developer.ieee.org</a> (200 req/day free) ·
+          Springer: <a href="https://dev.springernature.com" target="_blank" style="color:var(--blue)">dev.springernature.com</a> (5000 req/day free)
+        </div>
+      </div>
+
+      <div class="error-box" id="upload-error"></div>
+
+      <button class="btn-run" id="btn-run" disabled>
+        ⟶ &nbsp; RUN ANALYSIS
+      </button>
+    </div>
+  </div>
+
+  <!-- Progress Panel -->
+  <div class="panel" id="progress-panel">
+    <div class="panel-header">
+      <div class="panel-dot amber pulse" id="progress-dot"></div>
+      <span class="panel-label" id="progress-label">Processing…</span>
+    </div>
+    <div class="panel-body">
+      <div class="progress-track">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="log-stream" id="log-stream"></div>
+    </div>
+  </div>
+
+  <!-- Result Panel -->
+  <div class="panel fade-in" id="result-panel">
+    <div class="panel-header">
+      <div class="panel-dot" id="result-dot"></div>
+      <span class="panel-label">Analysis Report</span>
+      <span class="panel-label" id="result-elapsed" style="margin-left:auto;"></span>
+    </div>
+    <div class="panel-body" id="result-body">
+      <!-- injected by JS -->
+    </div>
+  </div>
+
+</div><!-- /layout -->
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let selectedFile = null;
+let currentJobId = null;
+let sseSource    = null;
+
+// ── DOM refs ─────────────────────────────────────────────────────────────────
+const uploadPanel   = document.getElementById('upload-panel');
+const progressPanel = document.getElementById('progress-panel');
+const resultPanel   = document.getElementById('result-panel');
+const fileInput     = document.getElementById('file-input');
+const uploadZone    = document.getElementById('upload-zone');
+const fileSelected  = document.getElementById('file-selected');
+const fileName      = document.getElementById('file-name');
+const fileSize      = document.getElementById('file-size');
+const btnRun        = document.getElementById('btn-run');
+const uploadError   = document.getElementById('upload-error');
+const progressBar   = document.getElementById('progress-bar');
+const progressLabel = document.getElementById('progress-label');
+const progressDot   = document.getElementById('progress-dot');
+const logStream     = document.getElementById('log-stream');
+const keysToggle    = document.getElementById('keys-toggle');
+const keysBody      = document.getElementById('keys-body');
+const keysArrow     = document.getElementById('keys-arrow');
+
+// ── Drag & drop ───────────────────────────────────────────────────────────────
+uploadZone.addEventListener('dragover',  e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', e => { uploadZone.classList.remove('dragover'); });
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+function handleFile(f) {
+  if (!f.name.toLowerCase().endsWith('.pdf')) {
+    showUploadError('Only PDF files are accepted.');
+    return;
+  }
+  if (f.size > 20 * 1024 * 1024) {
+    showUploadError('File exceeds 20 MB limit.');
+    return;
+  }
+  selectedFile = f;
+  hideUploadError();
+  fileName.textContent = f.name;
+  fileSize.textContent = formatBytes(f.size);
+  fileSelected.classList.add('show');
+  btnRun.disabled = false;
+}
+
+// ── Optional keys toggle ──────────────────────────────────────────────────────
+keysToggle.addEventListener('click', () => {
+  const open = keysBody.classList.toggle('open');
+  keysArrow.textContent = open ? '▼' : '▶';
+});
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+btnRun.addEventListener('click', runAnalysis);
+
+async function runAnalysis() {
+  if (!selectedFile) return;
+  hideUploadError();
+  btnRun.disabled = true;
+
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+
+  // Inject API keys as custom headers if provided
+  const ieeeKey     = document.getElementById('ieee-key').value.trim();
+  const springerKey = document.getElementById('springer-key').value.trim();
+
+  showProgress();
+
+  try {
+    const res = await fetch('/analyse/start', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        ...(ieeeKey     && { 'X-IEEE-Key': ieeeKey }),
+        ...(springerKey && { 'X-Springer-Key': springerKey }),
+      }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Upload failed.' }));
+      throw new Error(err.detail || 'Upload failed.');
+    }
+    const { job_id } = await res.json();
+    currentJobId = job_id;
+    startSSE(job_id);
+  } catch (err) {
+    hideProgress();
+    showUploadError(err.message);
+    btnRun.disabled = false;
+  }
+}
+
+// ── Server-Sent Events progress ───────────────────────────────────────────────
+function startSSE(jobId) {
+  if (sseSource) sseSource.close();
+  sseSource = new EventSource(`/analyse/progress/${jobId}`);
+
+  sseSource.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    updateProgress(d.progress, d.message, d.status);
+
+    if (d.status === 'done') {
+      sseSource.close();
+      fetchResult(jobId);
+    } else if (d.status === 'error') {
+      sseSource.close();
+      hideProgress();
+      showUploadError('Analysis failed: ' + d.message);
+      btnRun.disabled = false;
+    }
+  };
+
+  sseSource.onerror = () => {
+    sseSource.close();
+  };
+}
+
+function updateProgress(pct, msg, status) {
+  progressBar.style.width = pct + '%';
+  progressLabel.textContent = msg;
+  appendLog(msg);
+}
+
+function appendLog(msg) {
+  const now = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-time">${now}</span><span class="log-msg active">${escHtml(msg)}</span>`;
+  logStream.appendChild(line);
+  // dim previous lines
+  logStream.querySelectorAll('.log-msg.active').forEach((el, i, arr) => {
+    if (i < arr.length - 1) el.classList.remove('active');
+  });
+  logStream.scrollTop = logStream.scrollHeight;
+}
+
+// ── Fetch & render result ─────────────────────────────────────────────────────
+async function fetchResult(jobId) {
+  try {
+    const res = await fetch(`/analyse/result/${jobId}`);
+    if (!res.ok) throw new Error('Could not fetch result.');
+    const data = await res.json();
+    hideProgress();
+    renderResult(data);
+  } catch (err) {
+    hideProgress();
+    showUploadError(err.message);
+    btnRun.disabled = false;
+  }
+}
+
+function renderResult(data) {
+  const a = data.analysis;
+  const score = a.overall_similarity_score;
+  const verdict = a.verdict || 'Unknown';
+  const elapsed = data.elapsed_s;
+
+  // Update panel header
+  document.getElementById('result-elapsed').textContent =
+    `Completed in ${elapsed}s · ${data.papers_found} papers compared`;
+
+  // Score ring color
+  const color = score < 30 ? 'var(--green)' : score < 60 ? 'var(--amber)' : 'var(--red)';
+  const circumference = 2 * Math.PI * 44; // r=44
+  const offset = circumference * (1 - score / 100);
+
+  // Verdict badge class
+  const badgeClass = score < 30 ? 'low' : score < 60 ? 'medium' : 'high';
+
+  // Keywords
+  const kwHtml = (data.keywords || []).map(k =>
+    `<span class="keyword">${escHtml(k)}</span>`
+  ).join('');
+
+  // Flagged papers
+  const papersHtml = (a.flagged_papers || []).length === 0
+    ? `<div style="font-family:var(--mono);font-size:0.8rem;color:var(--text-dim);padding:16px 0;">
+         No papers with ≥20% similarity detected. The submission appears largely original.
+       </div>`
+    : (a.flagged_papers || []).map((p, i) => {
+        const pcolor = p.similarity_percent < 40 ? 'var(--green)' : p.similarity_percent < 70 ? 'var(--amber)' : 'var(--red)';
+        const titleHtml = p.url
+          ? `<a href="${escAttr(p.url)}" target="_blank">${escHtml(p.title)}</a>`
+          : escHtml(p.title);
+        return `
+<div class="paper-card">
+  <div class="paper-rank">#${p.rank || i+1}</div>
+  <div class="paper-info">
+    <div class="paper-title">${titleHtml}</div>
+    <div class="paper-authors">${escHtml((p.authors||''))} · ${escHtml(String(p.year||'n.d.'))}</div>
+    <span class="paper-source">${escHtml(p.source||'')}</span>
+    <div class="paper-reason">${escHtml(p.overlap_reason||'')}</div>
+  </div>
+  <div class="paper-sim" style="color:${pcolor}">${p.similarity_percent}%</div>
+</div>`;
+      }).join('');
+
+  const html = `
+    <div class="score-hero">
+      <div class="score-ring">
+        <svg viewBox="0 0 100 100" width="120" height="120">
+          <circle class="bg"   cx="50" cy="50" r="44"/>
+          <circle class="fill" cx="50" cy="50" r="44"
+            stroke="${color}"
+            stroke-dasharray="${circumference}"
+            stroke-dashoffset="${circumference}"
+            id="score-circle"/>
+        </svg>
+        <div class="score-num" style="color:${color}">
+          ${score}<span>/ 100</span>
+        </div>
+      </div>
+      <div class="score-meta">
+        <div class="verdict-badge ${badgeClass}">${escHtml(verdict)}</div>
+        <div class="meta-row">Document: <b>${escHtml(data.title)}</b></div>
+        <div class="meta-row">Pages: <b>${data.page_count}</b> · Words: <b>${data.word_count.toLocaleString()}</b></div>
+        <div class="meta-row">Confidence: <b>${escHtml(a.confidence||'')}</b></div>
+        <div class="keyword-list" style="margin-top:10px">${kwHtml}</div>
+      </div>
+    </div>
+
+    <div class="summary-text">${escHtml(a.summary||'').replace(/\n/g,'<br>')}</div>
+
+    <div class="insight-grid">
+      <div class="insight-card">
+        <h4>✦ Original Contributions</h4>
+        <p>${escHtml(a.original_contributions||'Not determined.')}</p>
+      </div>
+      <div class="insight-card">
+        <h4>⚑ Recommendations</h4>
+        <p>${escHtml(a.recommendations||'None.')}</p>
+      </div>
+    </div>
+
+    <div class="section-title">Flagged Similar Papers (${(a.flagged_papers||[]).length})</div>
+    ${papersHtml}
+
+    <button class="btn-reset" id="btn-reset">← New Analysis</button>
+  `;
+
+  document.getElementById('result-body').innerHTML = html;
+  resultPanel.style.display = 'block';
+
+  // Animate score ring after paint
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.getElementById('score-circle').style.strokeDashoffset = offset;
+    });
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', resetAll);
+  resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function showProgress() {
+  progressPanel.style.display = 'block';
+  uploadPanel.style.opacity   = '0.4';
+  uploadPanel.style.pointerEvents = 'none';
+  logStream.innerHTML = '';
+  progressBar.style.width = '0%';
+}
+function hideProgress() {
+  progressPanel.style.display = 'none';
+  uploadPanel.style.opacity   = '1';
+  uploadPanel.style.pointerEvents = '';
+}
+function showUploadError(msg) {
+  uploadError.textContent = '⚠ ' + msg;
+  uploadError.style.display = 'block';
+}
+function hideUploadError() {
+  uploadError.style.display = 'none';
+}
+function resetAll() {
+  selectedFile = null;
+  currentJobId = null;
+  if (sseSource) { sseSource.close(); sseSource = null; }
+  resultPanel.style.display   = 'none';
+  progressPanel.style.display = 'none';
+  uploadPanel.style.opacity   = '1';
+  uploadPanel.style.pointerEvents = '';
+  fileInput.value    = '';
+  fileSelected.classList.remove('show');
+  btnRun.disabled    = true;
+  logStream.innerHTML = '';
+  progressBar.style.width = '0%';
+  hideUploadError();
+  uploadPanel.scrollIntoView({ behavior:'smooth' });
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+function escAttr(s) { return escHtml(s); }
+</script>
+</body>
+</html>

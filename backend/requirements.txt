@@ -19,3 +19,7 @@ pytest-asyncio
 pytest-cov
 httpx
 anyio
+python-dotenv
+httpx
+prometheus-fastapi-instrumentator==6.1.0
+prometheus-client

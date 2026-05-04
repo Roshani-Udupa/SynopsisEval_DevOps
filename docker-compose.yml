@@ -1,22 +1,129 @@
 services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: synopsis_portal
-      POSTGRES_USER: postgres
+      POSTGRES_DB:       synopsis_portal
+      POSTGRES_USER:     postgres
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d synopsis_portal" ]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d synopsis_portal"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
+    networks: [synopsis-net]
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000" # Access at http://localhost:3001
+    volumes:
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+
+  # ── Plagiarism worker ─────────────────────────────────────────────────────────
+  # Internal service only. FastAPI backend calls it via http://plagiarism-worker:8000
+  # Port 8001 on the host is for local debugging only.
+  plagiarism-worker:
+    build:
+      context: ./plagiarism-worker
+      dockerfile: Dockerfile
+      args:
+        OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma2:2b}
+    image: synopsis-plagiarism-worker:latest
+    container_name: plagiarism-worker
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      OLLAMA_MODEL:     ${OLLAMA_MODEL:-gemma2:2b}
+      IEEE_API_KEY:     ${IEEE_API_KEY:-}
+      SPRINGER_API_KEY: ${SPRINGER_API_KEY:-}
+      GITHUB_TOKEN:     ${GITHUB_TOKEN:-}
+      MAX_UPLOAD_MB:    ${MAX_UPLOAD_MB:-20}
+      MAX_REFERENCES:   ${MAX_REFERENCES:-10}
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    networks: [synopsis-net]
+
+  # ── FastAPI backend ───────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: synopsis-backend:latest
+    container_name: synopsis-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL:            postgresql+asyncpg://postgres:postgres@db:5432/synopsis_portal
+      SECRET_KEY:              ${SECRET_KEY:-change-this-in-production}
+      ALGORITHM:               HS256
+      ACCESS_TOKEN_EXPIRE_MIN: 60
+      PLAGIARISM_WORKER_URL:   http://plagiarism-worker:8000
+      SMTP_HOST:               ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT:               ${SMTP_PORT:-587}
+      SMTP_USER:               ${SMTP_USER:-}
+      SMTP_PASSWORD:           ${SMTP_PASSWORD:-}
+      SMTP_FROM:               ${SMTP_FROM:-noreply@synopsis.edu}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      plagiarism-worker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [synopsis-net]
+
+  # ── React frontend ────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    image: synopsis-frontend:latest
+    container_name: synopsis-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on: [backend]
+    networks: [synopsis-net]
+
+networks:
+  synopsis-net:
+    driver: bridge
 
   sonarqube:
     image: sonarqube:10-community
@@ -63,3 +170,6 @@ volumes:
   sonarqube_logs:
   sonarqube_extensions:
   sonar_db_data:
+  ollama-models:
+      driver: local
+  uploads:
