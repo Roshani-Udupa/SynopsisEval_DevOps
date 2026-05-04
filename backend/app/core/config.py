@@ -7,10 +7,10 @@ dotenv.load_dotenv()
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/synopsis_portal"
+    DATABASE_URL: str = os.getenv("DATABASE_URL")
 
     # JWT
-    SECRET_KEY: str = "synopsis-super-secret-key-change-in-production-2024"
+    SECRET_KEY: str = os.getenv("SECRET_KEY")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 

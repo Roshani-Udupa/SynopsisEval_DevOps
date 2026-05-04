@@ -4,22 +4,9 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 
-# ══════════════════════════════════════════════════════════════════════════
-#  Auth Schemas
-# ══════════════════════════════════════════════════════════════════════════
-
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "email": "admin@synopsis.edu",
-                "password": "admin123"
-            }
-        }
-    }
 
 
 class TokenResponse(BaseModel):
@@ -33,12 +20,6 @@ class TokenResponse(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {"email": "student@example.com"}
-        }
-    }
 
 
 class PasswordResetConfirm(BaseModel):
@@ -62,9 +43,6 @@ class PasswordResetConfirm(BaseModel):
         return self
 
 
-# ══════════════════════════════════════════════════════════════════════════
-#  Reviewer Registration
-# ══════════════════════════════════════════════════════════════════════════
 
 class ReviewerRegisterRequest(BaseModel):
     email: EmailStr
@@ -72,7 +50,7 @@ class ReviewerRegisterRequest(BaseModel):
     full_name: str
     department: Optional[str] = None
     designation: Optional[str] = None
-    expertise: Optional[list[str]] = None   # e.g. ["ML", "IoT"]
+    expertise: Optional[list[str]] = None   
 
     @field_validator("password")
     @classmethod
@@ -88,23 +66,7 @@ class ReviewerRegisterRequest(BaseModel):
             raise ValueError("Full name must be at least 2 characters")
         return v.strip()
 
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "email": "reviewer@university.edu",
-                "password": "secure1234",
-                "full_name": "Dr. Jane Smith",
-                "department": "Computer Science",
-                "designation": "Associate Professor",
-                "expertise": ["Machine Learning", "NLP", "Computer Vision"]
-            }
-        }
-    }
 
-
-# ══════════════════════════════════════════════════════════════════════════
-#  Team Registration
-# ══════════════════════════════════════════════════════════════════════════
 
 class MemberInput(BaseModel):
     full_name: str
@@ -186,31 +148,6 @@ class TeamRegisterRequest(BaseModel):
         if len(all_emails) != len(set(all_emails)):
             raise ValueError("Duplicate email found — each member must have a unique email")
         return self
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "team_name": "Neural Nexus",
-                "leader_name": "Arjun Kumar",
-                "leader_email": "arjun@example.com",
-                "leader_usn": "1AB21CS001",
-                "leader_password": "leader1234",
-                "members": [
-                    {
-                        "full_name": "Priya Sharma",
-                        "email": "priya@example.com",
-                        "usn": "1AB21CS002",
-                        "password": "member1234"
-                    }
-                ],
-                "guide": {
-                    "full_name": "Prof. Ramesh B",
-                    "email": "ramesh@university.edu",
-                    "department": "Computer Science"
-                }
-            }
-        }
-    }
 
 
 # ══════════════════════════════════════════════════════════════════════════
